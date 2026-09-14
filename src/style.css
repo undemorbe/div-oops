@@ -1,0 +1,146 @@
+:root {
+  --bg: #0f1115;
+  --panel: #191c23;
+  --panel-2: #21252e;
+  --text: #e7e9ee;
+  --muted: #8a90a0;
+  --accent: #4f8cff;
+  --accent-hover: #3b78ee;
+  --error: #ff6b6b;
+  --border: #2b303b;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  justify-content: center;
+  padding: 48px 16px;
+}
+
+.app {
+  width: 100%;
+  max-width: 560px;
+}
+
+.app__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.app__header h1 {
+  font-size: 28px;
+  margin: 0;
+}
+
+.badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge--mock {
+  background: #3a2f12;
+  color: #f4c15a;
+}
+
+.badge--live {
+  background: #123a2a;
+  color: #5ce0a0;
+}
+
+.form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.form__input {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 15px;
+  outline: none;
+}
+
+.form__input:focus {
+  border-color: var(--accent);
+}
+
+.form__button {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form__button:hover {
+  background: var(--accent-hover);
+}
+
+.form__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.status {
+  min-height: 20px;
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.status--error {
+  color: var(--error);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.list__empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 24px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+}
+
+.card__title {
+  font-size: 15px;
+  word-break: break-word;
+}
