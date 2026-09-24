@@ -1,8 +1,8 @@
 # Лаба 0 - свой сервис (общий TODO List, без удаления))) )
 
 - **Фронтенд** — Vite + vanilla JS. [`frontend/`](frontend/)
-- **Бэкенд** — Go + Gin + GORM. [`backend/`](backend/)
-- **База данных** — PostgreSQL
+- **Бэкенд** — Go [`backend/`](backend/)
+- **База данных** - PostgreSQL
 
 ![Скриншот работающего приложения](frontend/docs/screenshot.png)
 
@@ -51,19 +51,4 @@
   #   BACKEND_PROXY_TARGET=https://<subdomain>.tunnel4.com
 
   npm run dev
-```
-
-```
-lab0/
-├── backend/
-│   ├── internal/         # main, handler, dto, entities, database, logger
-│   ├── migrations/       # SQL-миграции (up/down), golang-migrate
-│   ├── go.mod / go.sum
-│   └── .env.example
-└── frontend/
-    ├── src/              # main.js, api.js (контракты + mock), style.css
-    ├── index.html
-    ├── vite.config.js    # dev/preview + прокси /api → бэкенд (нативный forward)
-    ├── docs/screenshot.png
-    └── .env.example
 ```
