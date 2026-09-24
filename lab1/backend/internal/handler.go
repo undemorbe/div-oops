@@ -26,6 +26,12 @@ func (h *Handler) PostTask(c *gin.Context) {
 		return
 	}
 
+	if req.Task.Title == "" {
+		Log.Warn("Отсутствует Title")
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
 	task := Task{Title: req.Task.Title}
 
 	err = h.db.Save(&task).Error
@@ -60,4 +66,20 @@ func (h *Handler) GetTasks(c *gin.Context) {
 	response := GetTasksResponse{Tasks: taskModels}
 
 	c.JSON(http.StatusOK, response)
+}
+
+func (h *Handler) DeleteTasks(c *gin.Context) {
+
+	err := h.db.
+		Where("title != ?", "").
+		Delete(&Task{}).
+		Error
+
+	if err != nil {
+		Log.Error("Ошибка при удалении задач в БД: ", err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }

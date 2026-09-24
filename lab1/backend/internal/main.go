@@ -34,6 +34,7 @@ func main() {
 	{
 		api.GET("/tasks", handler.GetTasks)
 		api.POST("/task", handler.PostTask)
+		api.DELETE("/tasks", handler.DeleteTasks)
 	}
 
 	port := os.Getenv("PORT")
