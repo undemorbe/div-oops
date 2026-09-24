@@ -60,7 +60,9 @@ cp .env.example .env
 ```
 
 - `VITE_BACKEND_URL` **пусто** → mock-режим (данные в памяти).
-- `VITE_BACKEND_URL=http://localhost:8000` → ходит в реальный бэкенд.
+- `VITE_BACKEND_URL=/api` + `BACKEND_PROXY_TARGET=<origin бэкенда>` → ходит в
+  реальный бэкенд через Vite-прокси (same-origin, без CORS). Цель форварда:
+  локально `http://localhost:5040`, за туннелем — URL туннеля.
 
 3. Dev-режим (с hot-reload):
 
