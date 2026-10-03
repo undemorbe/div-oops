@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ошибка сервера</title>
+    <style>
+      :root {
+        --bg: #0f1115;
+        --text: #e7e9ee;
+        --muted: #8a90a0;
+        --accent: #ff8c4f;
+        --accent-hover: #ee7a3b;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: radial-gradient(1200px 600px at 50% -10%, #2a1c14 0%, var(--bg) 60%);
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .card {
+        width: 100%;
+        max-width: 440px;
+        text-align: center;
+      }
+      .code {
+        font-size: clamp(72px, 18vw, 120px);
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -3px;
+        background: linear-gradient(180deg, #fff0e6 0%, var(--accent) 120%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        margin: 0;
+      }
+      h1 { font-size: 22px; margin: 12px 0 8px; }
+      p {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.5;
+        margin: 0 0 28px;
+      }
+      .btn {
+        display: inline-block;
+        padding: 12px 22px;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #1a1207;
+        text-decoration: none;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .btn:hover { background: var(--accent-hover); }
+      .meta { margin-top: 28px; font-size: 12px; color: var(--muted); opacity: 0.7; }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <p class="code">50x</p>
+      <h1>Сервис временно недоступен</h1>
+      <p>На стороне сервера что-то пошло не так. Мы уже, наверное, чиним. Попробуйте обновить страницу чуть позже.</p>
+      <a class="btn" href="/">Обновить</a>
+      <p class="meta">nginx · TODO List</p>
+    </main>
+  </body>
+</html>

@@ -1,21 +1,26 @@
+
 import { defineConfig, loadEnv } from 'vite'
 import http from 'node:http'
 import https from 'node:https'
+import fs from 'node:fs'
 
-// Прокси на бэкенд: фронт зовёт свой же /api, Vite форвардит на бэкенд.
-// Браузер видит один origin → CORS на бэкенде не нужен (нет preflight OPTIONS).
-// Цель форварда — BACKEND_PROXY_TARGET (origin бэкенда, без /api).
-//
-// Свой forward через нативный http/https, а не встроенный proxy Vite:
-// встроенный http-proxy рвёт TLS с туннелем (не тот SNI). Node сам ставит
-// SNI из hostname, поэтому работает и с HTTPS-туннелем, и с локальным HTTP.
 function apiProxyPlugin(target) {
   const t = new URL(target)
   const client = t.protocol === 'https:' ? https : http
   const port = t.port || (t.protocol === 'https:' ? 443 : 80)
 
   const handler = (req, res, next) => {
-    if (!req.url.startsWith('/api')) return next()
+    if (!req.url?.startsWith('/api')) return next()
+
+    const headers = {}
+
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (!key.startsWith(':')) {
+        headers[key] = value
+      }
+    }
+
+    headers.host = t.host
 
     const proxyReq = client.request(
       {
@@ -24,7 +29,7 @@ function apiProxyPlugin(target) {
         port,
         path: req.url,
         method: req.method,
-        headers: { ...req.headers, host: t.host },
+        headers,
       },
       (proxyRes) => {
         res.writeHead(proxyRes.statusCode || 502, proxyRes.headers)
@@ -57,7 +62,17 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [apiProxyPlugin(target)],
-    server: { port: 5173, host: true },
-    preview: { port: 4173, host: true },
+    server: {
+      port: 5173,
+      host: true,
+      https: {
+        key: fs.readFileSync('./localhost-key.pem'),
+        cert: fs.readFileSync('./localhost.pem'),
+      },
+    },
+    preview: {
+      port: 4173,
+      host: true,
+    },
   }
 })
