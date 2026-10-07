@@ -37,27 +37,72 @@ lab1/
 
 ## Запуск
 
-Нужны: nginx, mkcert (`mkcert -install` один раз), htpasswd, Go, Node.js, PostgreSQL из лабы 0.
+Все команды - из каталога `lab1/`.
+
+**Один раз:** сертификат, пароль для `/admin`, сборка фронта, каталог для pid/логов.
 
 ```bash
-echo '127.0.0.1 todo.local project2.local' | sudo tee -a /etc/hosts
+mkdir -p nginx/certs && mkcert -cert-file nginx/certs/local.pem -key-file nginx/certs/local-key.pem todo.local project2.local localhost 127.0.0.1
 ```
 
 ```bash
-cd lab1
+htpasswd -cB nginx/.htpasswd admin
 ```
 
 ```bash
-./lab.sh setup
+(cd ../lab0/frontend && npm install && npm run build)
 ```
 
 ```bash
-./lab.sh up
+mkdir -p run/tmp
 ```
 
-`setup` выпускает сертификат на `todo.local`, `project2.local`, `localhost`, `127.0.0.1`,
-создаёт `nginx/.htpasswd` (спросит пароль; можно задать `ADMIN_USER`/`ADMIN_PASSWORD`),
-собирает фронт (`vite build`) и бэкенд (`run/todo-backend`).
-`up` поднимает `backend-1` на :5040 и `backend-2` на :5041 и запускает nginx.
+**Каждый запуск:**
+
+Терминал 1 — backend-1:
+
+```bash
+cd ../lab0/backend && PORT=5040 INSTANCE_ID=backend-1 go run ./internal
+```
+
+Терминал 2 — backend-2:
+
+```bash
+cd ../lab0/backend && PORT=5041 INSTANCE_ID=backend-2 go run ./internal
+```
+
+Терминал 3 — проверить конфиг и запустить nginx (без sudo):
+
+```bash
+nginx -p "$PWD/" -c nginx/nginx.conf -e run/error.log -t
+```
+
+```bash
+nginx -p "$PWD/" -c nginx/nginx.conf -e run/error.log
+```
+
+Балансировка:
+
+```bash
+for i in $(seq 6); do curl -s https://todo.local/api/whoami; echo; done
+```
+
+Отказ: Ctrl+C в терминале 1, повторить цикл `curl`.
+
+Перечитать конфиг после правки / остановить nginx:
+
+```bash
+nginx -p "$PWD/" -c nginx/nginx.conf -e run/error.log -s reload
+```
+
+```bash
+nginx -p "$PWD/" -c nginx/nginx.conf -e run/error.log -s quit
+```
+
+При ручном запуске проверки гоняются без автоматического гашения бэкенда:
+
+```bash
+SKIP_FAILOVER=1 ./check.sh
+```
 
 Открыть: <https://todo.local>, <https://todo.local/docs/>, <https://todo.local/admin/>, <https://project2.local>.
