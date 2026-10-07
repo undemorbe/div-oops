@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -30,14 +31,28 @@ func main() {
 
 	handler := NewHandler(db)
 
+	port := os.Getenv("PORT")
+
+	// Идентификатор инстанса — чтобы за балансировщиком было видно, кто ответил.
+	instanceID := os.Getenv("INSTANCE_ID")
+	if instanceID == "" {
+		instanceID = "backend:" + port
+	}
+	r.Use(func(c *gin.Context) {
+		c.Header("X-Instance-Id", instanceID)
+		c.Next()
+	})
+
 	api := r.Group("/api")
 	{
+		api.GET("/whoami", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"instance": instanceID, "port": port})
+		})
 		api.GET("/tasks", handler.GetTasks)
 		api.POST("/task", handler.PostTask)
 		api.DELETE("/tasks", handler.DeleteTasks)
 	}
 
-	port := os.Getenv("PORT")
 	Log.Info("Сервер запущен на порту :" + port)
 
 	if err := r.Run(":" + port); err != nil {
