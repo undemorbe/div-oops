@@ -83,7 +83,3 @@ func (h *Handler) DeleteTasks(c *gin.Context) {
 
 	c.Status(http.StatusNoContent)
 }
-
-func (h *Handler) GetPort(c *gin.Context) {
-	c.JSON(http.StatusOK, GetPortResponse{Port: Port})
-}

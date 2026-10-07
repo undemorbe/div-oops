@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -38,7 +39,9 @@ func main() {
 		api.POST("/task", handler.PostTask)
 		api.DELETE("/tasks", handler.DeleteTasks)
 
-		api.GET("/port", handler.GetPort)
+		r.GET("/health", func(c *gin.Context) {
+			c.Status(http.StatusOK)
+		})
 	}
 
 	Port = os.Getenv("PORT")
