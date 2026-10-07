@@ -1,6 +1,4 @@
-# Лаба 1 — nginx
-
-nginx - Точка входа сайта
+# Лаба 1 - nginx
 
 ## Что сделали
 1) Скачали инструментарий, mkcert, nginx. 
@@ -210,6 +208,8 @@ location /admin {
 
 
 Результат выполнения check.sh:
+<img width="406" height="463" alt="image" src="https://github.com/user-attachments/assets/9f95b3f3-a6a7-4cb3-a53f-e9504c5a56c4" />
+<img width="387" height="452" alt="image" src="https://github.com/user-attachments/assets/cb80b44e-af11-4d89-9f10-57c75e329707" />
 
 
 
