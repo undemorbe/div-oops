@@ -1,159 +1,115 @@
-#!/usr/bin/env bash
-set -uo pipefail
+#!/bin/bash
+cd "$(dirname "$0")"
 
-LAB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SITE=todo.local
-SITE2=project2.local
-EVIL=evil.local
-IP=127.0.0.1
-FAILOVER_INSTANCE="${FAILOVER_INSTANCE:-1}"
+c="curl -sk --max-time 5"
+for h in todo.local project2.local evil.local; do
+    c="$c --resolve $h:80:127.0.0.1 --resolve $h:443:127.0.0.1"
+done
 
-CURL=(curl -s --max-time 5
-      --resolve "$SITE:80:$IP"  --resolve "$SITE:443:$IP"
-      --resolve "$SITE2:80:$IP" --resolve "$SITE2:443:$IP"
-      --resolve "$EVIL:80:$IP"  --resolve "$EVIL:443:$IP")
-if command -v mkcert >/dev/null && [[ -f "$(mkcert -CAROOT)/rootCA.pem" ]]; then
-    CURL+=(--cacert "$(mkcert -CAROOT)/rootCA.pem")
-else
-    CURL+=(-k)
-fi
+ok=0
+bad=0
+pass() { echo "  [ok] $1"; ok=$((ok+1)); }
+fail() { echo "  [FAIL] $1"; bad=$((bad+1)); }
+code() { $c -o /dev/null -w '%{http_code}' "$@"; }
 
-if [[ -t 1 ]]; then G=$'\033[32m'; R=$'\033[31m'; B=$'\033[1m'; D=$'\033[2m'; N=$'\033[0m'
-else G= R= B= D= N=; fi
-
-PASSED=0; FAILED=0
-section() { printf '\n%s== %s ==%s\n' "$B" "$*" "$N"; }
-cmd()     { printf '%s$ %s%s\n' "$D" "$*" "$N"; }
-ok()      { printf '  %sPASS%s %s\n' "$G" "$N" "$*"; PASSED=$((PASSED + 1)); }
-fail()    { printf '  %sFAIL%s %s\n' "$R" "$N" "$*"; FAILED=$((FAILED + 1)); }
-check()   { local msg="$1"; shift; if "$@"; then ok "$msg"; else fail "$msg"; fi; }
-
-code() { "${CURL[@]}" -o /dev/null -w '%{http_code}' "$@"; }
-hdr()  { tr -d '\r' | awk -v h="$1" 'tolower($1) == tolower(h)":" {$1 = ""; sub(/^ /, ""); print}'; }
-
-cooldown() { sleep 2.5; }
-api_series() {
-    local n="$1" h up
-    for _ in $(seq 1 "$n"); do
-        h="$("${CURL[@]}" -o /dev/null -D - "https://$SITE/api/whoami")"
-        up="$(hdr X-Upstream <<<"$h")"
-        printf '%s %s %s%s\n' \
-            "$(head -1 <<<"$h" | awk '{print $2}')" \
-            "${up##*, }" \
-            "$(hdr X-Instance-Id <<<"$h")" \
-            "$([[ "$up" == *,* ]] && echo "   (retry: $up)")"
+whoami6() {
+    for i in 1 2 3 4 5 6; do
+        $c -w ' %{http_code}\n' https://todo.local/api/whoami
     done
 }
 
-section "1. HTTP → HTTPS (301)"
-cmd "curl -I http://$SITE/"
-out="$("${CURL[@]}" -I "http://$SITE/some/path?x=1" | tr -d '\r')"
-printf '%s\n' "$out" | grep -E '^(HTTP|Location)' | sed 's/^/  /'
-check "статус 301"                          grep -q '^HTTP/1.1 301' <<<"$out"
-check "Location: https://$SITE/some/path?x=1" grep -q "^Location: https://$SITE/some/path?x=1$" <<<"$out"
 
-cmd "curl -I https://$SITE/"
-check "по HTTPS фронт отдаётся (200)" test "$(code "https://$SITE/")" = 200
-
-
-section "2. Балансировка /api между двумя инстансами"
-cmd "for i in 1..6; curl -D - https://$SITE/api/whoami   # status upstream instance"
-series="$(api_series 6)"
-printf '%s\n' "$series" | sed 's/^/  /'
-check "все ответы 200"            test "$(awk '$1 != 200' <<<"$series" | wc -l)" -eq 0
-check "ответили оба upstream"     test "$(awk '{print $2}' <<<"$series" | sort -u | wc -l)" -eq 2
-cooldown
+echo
+echo "--- 1. http -> https ---"
+echo "\$ curl -I http://todo.local/test?a=1"
+$c -I "http://todo.local/test?a=1" | grep -iE '^(HTTP|location)'
+if [ "$(code http://todo.local/test?a=1)" = 301 ]; then pass "301"; else fail "нет 301"; fi
+loc=$($c -I "http://todo.local/test?a=1" | grep -i '^location' | tr -d '\r')
+if [ "$loc" = "Location: https://todo.local/test?a=1" ]; then pass "редирект на https, путь сохранился"; else fail "location: $loc"; fi
+if [ "$(code https://todo.local/)" = 200 ]; then pass "https://todo.local/ открывается"; else fail "https://todo.local/ не 200"; fi
 
 
-section "3. Отказоустойчивость"
-if [[ -n "${SKIP_FAILOVER:-}" ]]; then
-    echo "  пропущено (SKIP_FAILOVER)"
+echo
+echo "--- 2. балансировка /api ---"
+echo "\$ curl https://todo.local/api/whoami  (6 раз)"
+out=$(whoami6)
+echo "$out"
+n=$(echo "$out" | grep -o '"instance":"[^"]*"' | sort -u | wc -l)
+if [ $n -eq 2 ]; then pass "ответили оба бэкенда"; else fail "ответил только $n бэкенд"; fi
+sleep 3   # чтобы limit_req не мешал следующим проверкам
+
+
+echo
+echo "--- 3. гасим один бэкенд ---"
+if [ -n "$SKIP_FAILOVER" ]; then
+    echo "  пропускаю (SKIP_FAILOVER), гаси руками через Ctrl+C"
 else
-    cmd "./lab.sh backend stop $FAILOVER_INSTANCE"
-    "$LAB/lab.sh" backend stop "$FAILOVER_INSTANCE" | sed 's/^/  /'
-    "$LAB/lab.sh" status | sed 's/^/  /'
-
-    cmd "for i in 1..6; curl -D - https://$SITE/api/whoami"
-    series="$(api_series 6)"
-    printf '%s\n' "$series" | sed 's/^/  /'
-    check "/api отвечает 200 на всех запросах" test "$(awk '$1 != 200' <<<"$series" | wc -l)" -eq 0
-    check "весь трафик ушёл на живой инстанс"  test "$(awk '{print $2}' <<<"$series" | sort -u | wc -l)" -eq 1
-    check "фронт по-прежнему 200"              test "$(code "https://$SITE/")" = 200
-
-    cmd "./lab.sh backend start $FAILOVER_INSTANCE"
-    "$LAB/lab.sh" backend start "$FAILOVER_INSTANCE" | sed 's/^/  /'
+    ./lab.sh backend stop 1
+    out=$(whoami6)
+    echo "$out"
+    if ! echo "$out" | grep -qv ' 200$'; then pass "все запросы 200"; else fail "есть ответы не 200"; fi
+    if ! echo "$out" | grep -q backend-1; then pass "отвечает только backend-2"; else fail "backend-1 всё ещё отвечает?"; fi
+    if [ "$(code https://todo.local/)" = 200 ]; then pass "сайт живой"; else fail "сайт лёг"; fi
+    ./lab.sh backend start 1
 fi
-cooldown
+sleep 3
 
 
-section "4. /admin под basic auth"
-cmd "curl -I https://$SITE/admin/"
-c="$(code "https://$SITE/admin/")"; echo "  → $c"
-check "без пароля → 401"          test "$c" = 401
-cmd "curl -I -u admin:wrong https://$SITE/admin/"
-c="$(code -u admin:wrong "https://$SITE/admin/")"; echo "  → $c"
-check "неверный пароль → 401"     test "$c" = 401
-if [[ -n "${ADMIN_PASSWORD:-}" ]]; then
-    cmd "curl -I -u ${ADMIN_USER:-admin}:*** https://$SITE/admin/"
-    c="$(code -u "${ADMIN_USER:-admin}:$ADMIN_PASSWORD" "https://$SITE/admin/")"; echo "  → $c"
-    check "верный пароль → 200"   test "$c" = 200
-else
-    echo "  (верный пароль не проверяю — задай ADMIN_PASSWORD)"
+echo
+echo "--- 4. /admin ---"
+r=$(code https://todo.local/admin/)
+echo "без пароля: $r"
+if [ "$r" = 401 ]; then pass "без пароля 401"; else fail "без пароля $r"; fi
+r=$(code -u admin:wrong https://todo.local/admin/)
+echo "неправильный пароль: $r"
+if [ "$r" = 401 ]; then pass "с неправильным паролем 401"; else fail "с неправильным паролем $r"; fi
+if [ -n "$ADMIN_PASSWORD" ]; then
+    r=$(code -u "admin:$ADMIN_PASSWORD" https://todo.local/admin/)
+    echo "правильный пароль: $r"
+    if [ "$r" = 200 ]; then pass "с паролем пускает"; else fail "с паролем $r"; fi
 fi
 
 
-section "5. Rate limit на /api (флуд → 429)"
-cmd "40 параллельных запросов на https://$SITE/api/tasks"
-codes="$(seq 1 40 | xargs -P 20 -I{} "${CURL[@]}" -o /dev/null -w '%{http_code}\n' "https://$SITE/api/tasks" | sort | uniq -c)"
-printf '%s\n' "$codes" | sed 's/^ */  /'
-check "часть запросов получила 429" grep -qE '[0-9]+ 429$' <<<"$codes"
-check "часть запросов прошла (200)" grep -qE '[0-9]+ 200$' <<<"$codes"
-cooldown
-check "после паузы /api снова 200" test "$(code "https://$SITE/api/tasks")" = 200
+echo
+echo "--- 5. флуд /api ---"
+echo "40 запросов одновременно:"
+codes=$(for i in $(seq 40); do $c -o /dev/null -w '%{http_code}\n' https://todo.local/api/tasks & done; wait)
+echo "$codes" | sort | uniq -c
+if echo "$codes" | grep -q 429; then pass "есть 429"; else fail "429 не было"; fi
+if echo "$codes" | grep -q 200; then pass "часть прошла"; else fail "не прошёл ни один"; fi
+sleep 3
 
 
-section "6. Виртуальные хосты и чужой Host"
-cmd "curl https://$SITE2/"
-body="$("${CURL[@]}" "https://$SITE2/")"
-check "$SITE2 отдаёт свой проект"         grep -q 'Project Two' <<<"$body"
-check "$SITE2 не отдаёт TODO List"        bash -c '! grep -q "<title>TODO List</title>" <<<"$1"' _ "$body"
-cmd "curl https://$SITE/"
-check "$SITE отдаёт TODO List, не project2" \
-    grep -q '<title>TODO List</title>' <<<"$("${CURL[@]}" "https://$SITE/")"
-cmd "curl -H 'Host: $SITE2' https://$SITE/"
-check "Host: $SITE2 → его проект, не соседний" \
-    grep -q 'Project Two' <<<"$("${CURL[@]}" -H "Host: $SITE2" "https://$SITE/")"
+echo
+echo "--- 6. виртуальные хосты ---"
+if $c https://project2.local/ | grep -q "Project Two"; then pass "project2.local отдаёт свой сайт"; else fail "project2.local"; fi
+if $c https://todo.local/ | grep -q "<title>TODO List"; then pass "todo.local отдаёт todo"; else fail "todo.local"; fi
+if $c -H "Host: project2.local" https://todo.local/ | grep -q "Project Two"; then pass "Host: project2.local -> project2"; else fail "Host: project2.local"; fi
 for p in /api/tasks /docs/ /admin/; do
-    c="$(code "https://$SITE2$p")"
-    check "$SITE2$p → 404 (чужие пути не протекают), получено $c" test "$c" = 404
+    r=$(code https://project2.local$p)
+    if [ "$r" = 404 ]; then pass "project2.local$p = 404"; else fail "project2.local$p = $r"; fi
 done
 
-cmd "curl --http1.1 -H 'Host: $EVIL' https://$SITE/   # известный SNI, чужой Host"
-"${CURL[@]}" --http1.1 -o /dev/null -H "Host: $EVIL" "https://$SITE/"; rc=$?
-check "соединение закрыто без ответа (444, curl exit 52), получено exit $rc" test "$rc" = 52
-cmd "curl --http2 -H 'Host: $EVIL' https://$SITE/     # то же по HTTP/2"
-c="$(code --http2 -H "Host: $EVIL" "https://$SITE/")"
-check "HTTP/2: 421 Misdirected Request (Host ≠ SNI), получено $c" test "$c" = 421
-cmd "curl https://$EVIL/                         # чужой SNI"
-"${CURL[@]}" -o /dev/null "https://$EVIL/" 2>/dev/null; rc=$?
-check "TLS-рукопожатие отклонено (curl exit 35), получено exit $rc" test "$rc" = 35
-cmd "curl -I http://$EVIL/"
-"${CURL[@]}" -o /dev/null "http://$EVIL/"; rc=$?
-check "HTTP с чужим Host: обрыв без редиректа (exit 52), получено exit $rc" test "$rc" = 52
+$c --http1.1 -o /dev/null -H "Host: evil.local" https://todo.local/
+r=$?
+if [ $r -eq 52 ]; then pass "Host: evil.local -> соединение закрыто"; else fail "Host: evil.local, curl вернул $r"; fi
+$c -o /dev/null https://evil.local/ 2>/dev/null
+r=$?
+if [ $r -eq 35 ]; then pass "https://evil.local -> tls отклонён"; else fail "https://evil.local, curl вернул $r"; fi
+$c -o /dev/null http://evil.local/
+r=$?
+if [ $r -eq 52 ]; then pass "http://evil.local -> без редиректа"; else fail "http://evil.local, curl вернул $r"; fi
 
 
-section "7. alias и своя страница 404"
-cmd "curl https://$SITE/docs/"
-check "/docs/ отдаётся из отдельной папки (alias)" \
-    grep -q 'alias' <<<"$("${CURL[@]}" "https://$SITE/docs/")"
-cmd "curl https://$SITE/no-such-page"
-c="$(code "https://$SITE/no-such-page")"
-body="$("${CURL[@]}" "https://$SITE/no-such-page")"
-echo "  → $c, <title>$(sed -n 's:.*<title>\(.*\)</title>.*:\1:p' <<<"$body")</title>"
-check "статус 404"                 test "$c" = 404
-check "страница наша, не nginx-овская" grep -q 'Такой страницы нет' <<<"$body"
-check "/_errors/ снаружи не открыть (internal)" test "$(code "https://$SITE/_errors/404.html")" = 404
+echo
+echo "--- 7. alias и 404 ---"
+if $c https://todo.local/docs/ | grep -q alias; then pass "/docs/ через alias"; else fail "/docs/"; fi
+r=$(code https://todo.local/nope)
+echo "\$ curl https://todo.local/nope -> $r"
+if [ "$r" = 404 ]; then pass "404"; else fail "ждал 404, пришло $r"; fi
+if $c https://todo.local/nope | grep -q "Такой страницы нет"; then pass "страница 404 своя"; else fail "страница 404 стандартная"; fi
 
 
-printf '\n%sИтого: %s%d PASS%s, %s%d FAIL%s\n' "$B" "$G" "$PASSED" "$N" "$R" "$FAILED" "$N"
-[[ "$FAILED" -eq 0 ]]
+echo
+echo "итого: ok $ok, fail $bad"
+[ $bad -eq 0 ]

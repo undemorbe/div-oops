@@ -3,8 +3,8 @@
 nginx - Точка входа сайта
 
 ## Что сделали
-1) Скачали инструментарий, mkcert, nginx, 
-2) Сделали https, самоподисали через mkcert, чтобы сайт считался https, и можно было редиректить из 80 на 443.
+1) Скачали инструментарий, mkcert, nginx. 
+2) Сделали https, самоподисали через mkcert, чтобы сайт считался https (cертификат подтверждает, что сервер владеет именем) , и можно было редиректить из 80 на 443. 
 3) Сверстали 2 проект, ошибки, alias сайт, admin сайт.
    - Alias - часть сайта которая будет открываться только по прямому .../NAME/, попасть из поиска в Гугл например, нельзя.
    - Admin часть сделали htpasswd, в такую часть можно попасть аналогично как и по alias, но при входе будет требовать пароль
@@ -17,6 +17,54 @@ Nginx подставляет подписанные сертификаты и п
 Подключили limit-req, 5 запросов с 1 ip, пропускает сразу до 10 лишних запросов сверху, все что больше - уходит в 429.
 
 Важный нюанс, для отказоустойчивости используется zone (общая память для upstream, счетчики для worker-процессов),без него каждый воркер пытался бы еще работать с мертвым сервером.
+
+Результат выполнения check.sh:
+
+
+
+Конфиг:
+```worker_processes auto;
+pid              run/nginx.pid;
+error_log        run/error.log warn;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    sendfile      on;
+    server_tokens off;
+
+    access_log run/access.log;
+
+    client_body_temp_path run/tmp/client_body;
+    proxy_temp_path       run/tmp/proxy;
+    fastcgi_temp_path     run/tmp/fastcgi;
+    uwsgi_temp_path       run/tmp/uwsgi;
+    scgi_temp_path        run/tmp/scgi;
+
+    # Балансировка
+    upstream todo_backend {
+        zone todo_backend 1m;
+        server 127.0.0.1:5040 max_fails=1 fail_timeout=10s;
+        server 127.0.0.1:5041 max_fails=1 fail_timeout=10s;
+        keepalive 16;
+    }
+
+    # Rate limit
+    limit_req_zone   $binary_remote_addr zone=api:10m rate=5r/s;
+    limit_req_status 429;
+    limit_req_log_level warn;
+
+    include sites/*.conf;
+}
+```
+
+Разбит на множество файлов, для лучшей читаемости
+
 
 ## Структура
 
