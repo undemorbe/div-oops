@@ -7,6 +7,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
+var Port string
+
 func main() {
 	r := gin.Default()
 
@@ -35,12 +37,14 @@ func main() {
 		api.GET("/tasks", handler.GetTasks)
 		api.POST("/task", handler.PostTask)
 		api.DELETE("/tasks", handler.DeleteTasks)
+
+		api.GET("/port", handler.GetPort)
 	}
 
-	port := os.Getenv("PORT")
-	Log.Info("Сервер запущен на порту :" + port)
+	Port = os.Getenv("PORT")
+	Log.Info("Сервер запущен на порту :" + Port)
 
-	if err := r.Run(":" + port); err != nil {
+	if err := r.Run(":" + Port); err != nil {
 		Log.Error(err)
 	}
 }
