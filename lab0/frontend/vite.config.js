@@ -58,21 +58,21 @@ function apiProxyPlugin(target) {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const target = env.BACKEND_PROXY_TARGET || 'http://localhost:5040'
+   const target = env.BACKEND_PROXY_TARGET || 'http://localhost:5040'
+
+  const hasCerts = fs.existsSync('./localhost-key.pem') && fs.existsSync('./localhost.pem')
 
   return {
     plugins: [apiProxyPlugin(target)],
     server: {
       port: 5173,
       host: true,
-      https: {
-        key: fs.readFileSync('./localhost-key.pem'),
-        cert: fs.readFileSync('./localhost.pem'),
-      },
-    },
-    preview: {
-      port: 4173,
-      host: true,
+      https: hasCerts
+        ? {
+            key: fs.readFileSync('./localhost-key.pem'),
+            cert: fs.readFileSync('./localhost.pem'),
+          }
+        : undefined,
     },
   }
 })
