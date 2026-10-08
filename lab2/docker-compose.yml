@@ -1,0 +1,11 @@
+services:
+  backend:
+
+    build:
+      context: ../lab0/backend
+      dockerfile: ../../lab2/Dockerfile.backend
+    
+    ports:
+      - "5040:5040"
+    
+    

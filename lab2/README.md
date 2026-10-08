@@ -15,7 +15,7 @@ COPY . .
 
 RUN go mod download
 
-RUN go build -o server ./internal
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o server ./internal
 
 EXPOSE 5040
 
@@ -35,7 +35,7 @@ CMD ["./server"]
 Переделаем Dockerfile.backend по нормальному:
 
 ```
-FROM golang:1.25.0 AS builder
+FROM golang:1.25.11 AS builder
 
 WORKDIR /app
 
@@ -45,7 +45,7 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o server ./internal
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o server ./internal
 
 
 FROM alpine:3.22.1
@@ -60,35 +60,7 @@ USER backend_user
 
 EXPOSE 5040
 
-FROM golang:1.25.0 AS builder
-
-WORKDIR /app
-
-COPY go.mod go.sum ./
-
-RUN go mod download
-
-COPY . .
-
-RUN go build -o server ./internal
-
-
-FROM alpine:3.22.1
-
-RUN adduser -D backend_user
-
-WORKDIR /app
-
-COPY --from=builder /app/server ./server
-
-USER backend_user
-
-EXPOSE 5040
-
-HEALTHCHECK --interval=60s --timeout=5s --start-period=10s --retries=3 CMD wget --spider -q http://localhost:5040/health || exit 1
-
-CMD ["./server"]
-
+HEALTHCHECK --interval=60s --timeout=5s --retries=3 CMD wget --spider -q http://localhost:5040/health || exit 1
 
 CMD ["./server"]
 ```
@@ -96,6 +68,7 @@ CMD ["./server"]
 Сначала исправляем проблему с образом go, а именно берем определенную версию (1.25.0). Также указываем, что будем использовать образ golang только для сборки (Привет, multi-stage build).
 
 Добавляем нормальный порядок слоев: сначала копируем go.mod и go.sum (файлы с указанием зависимостей), потом устанавливаем зависимости (RUN go mod download). И только после этого мы копируем все файлы с кодом и компилируем приложение. Так мы добавляем кэширование зависимостей, и они не устанавливаются, если они не менялись. Компилируем код в файл server для следующей стадии
+(P.S. Путем ошибок и страданий выяснилось, что просто так на Alpine бинарник Go не запускается, поэтому к строке RUN go build -o server ./internal нужно добавить CGO_ENABLED=0 GOOS=linux GOARCH=amd64 - только так наш бинарник начнет исправно запускаться на Alpine)
 
 Переходим на вторую стадию. Сначала берем образ alpine для запуска сервера на нем. Добавляем второго пользователя (backend_user), которого потом будем использовать (строкой USER backend_user). Этим решим проблему root пользователем.
 
@@ -103,8 +76,27 @@ CMD ["./server"]
 
 Поскольку мы разделили Dockerfile на 2 стадии (build и runtime), во второй стадии мы уже не используем образ языка, так что размер нашего образа должен стать меньше.
 
-также мы добавили Healthcheck - раз в 60 секунд мы проверяем состояние сервера. На это мы даем 5 секунд и 3 попытки. Добавляем --spider, чтобы ответ сервера не сохранялся. Это проверяет, что контейнер живой и сервер работает.
+Также мы добавили Healthcheck - раз в 60 секунд мы проверяем состояние сервера. На это мы даем 5 секунд и 3 попытки. Добавляем --spider, чтобы ответ сервера не сохранялся. Это проверяет, что контейнер живой и сервер работает.
 
+Кроме того, не лишним будет добавить Dockerfile.backend.dockerignore, в котором уберем из образа файлы гита и IDE, .env, логи и временные файлы.
+
+Проверим, что "хороший" Dockerfile лучше "плохого". Сначала найдем размеры образов:
+![alt text](screenshots/image_size_backend.png)
+Как можно заметить, "плохой" образ занимает в РАЗЫ больше места, чем хороший - это благодаря multi-stage build.
+
+Теперь проверим пользователей. Запустим контейнеры с "хорошим" и "плохим" образами и посмотрим, какие у них владельцы:
+![alt text](screenshots/owners_backend.png)
+Действительно, у хорошего контейнера пользователь - backend_user, у плохого - root.
+
+Также проверим время билда образов с плохо и хорошо реализованным кэшированием. Для этого добавим одну строчку в код и пересоберем образы.
+
+Для хорошего образа:
+![alt text](screenshots/build_time_backend_good.png)
+Для плохого образа:
+![alt text](screenshots/build_time_backend_bad.png)
+Как можно заметить, разница во времени из-за плохого размещения слоев существенная.
+
+Таким образом, можно сделать вывод, что Dockerfile с best-practices действительно оптимизированнее и надежнее
 
 ## Dockerfile.frontend
 

@@ -1,11 +1,11 @@
 package main
 
 import (
-	"net/http"
+	// "net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
+	// "github.com/joho/godotenv"
 )
 
 var Port string
@@ -13,25 +13,27 @@ var Port string
 func main() {
 	r := gin.Default()
 
+	Log.Info("")
+
 	InitLogger()
 
-	if err := godotenv.Load(); err != nil {
-		Log.Fatal("Ошибка при загрузке .env файла")
-	}
+	// if err := godotenv.Load(); err != nil {
+	// 	Log.Fatal("Ошибка при загрузке .env файла")
+	// }
 
-	db, err := NewPostgresConnection()
-	if err != nil {
-		Log.Fatal("Ошибка подключения к БД: ", err)
-	}
-	Log.Info("Успешно осуществлено подключение к БД")
+	// db, err := NewPostgresConnection()
+	// if err != nil {
+	// 	Log.Fatal("Ошибка подключения к БД: ", err)
+	// }
+	// Log.Info("Успешно осуществлено подключение к БД")
 
-	err = RunMigrations(db)
-	if err != nil {
-		Log.Fatal("Ошибка применения миграций: ", err)
-	}
+	// err = RunMigrations(db)
+	// if err != nil {
+	// 	Log.Fatal("Ошибка применения миграций: ", err)
+	// }
 	Log.Info("Миграции успешно применены")
 
-	handler := NewHandler(db)
+	// handler := NewHandler(db)
 
 	port := os.Getenv("PORT")
 
@@ -45,19 +47,15 @@ func main() {
 		c.Next()
 	})
 
-	api := r.Group("/api")
-	{
-		api.GET("/whoami", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"instance": instanceID, "port": port})
-		})
-		api.GET("/tasks", handler.GetTasks)
-		api.POST("/task", handler.PostTask)
-		api.DELETE("/tasks", handler.DeleteTasks)
-
-		r.GET("/health", func(c *gin.Context) {
-			c.Status(http.StatusOK)
-		})
-	}
+	// api := r.Group("/api")
+	// {
+	// 	api.GET("/whoami", func(c *gin.Context) {
+	// 		c.JSON(http.StatusOK, gin.H{"instance": instanceID, "port": port})
+	// 	})
+	// 	api.GET("/tasks", handler.GetTasks)
+	// 	api.POST("/task", handler.PostTask)
+	// 	api.DELETE("/tasks", handler.DeleteTasks)
+	// }
 
 	Log.Info("Сервер запущен на порту :" + port)
 
