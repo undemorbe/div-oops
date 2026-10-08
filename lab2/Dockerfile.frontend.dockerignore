@@ -1,6 +1,9 @@
 node_modules
 dist
 docs
+.vite
+.git
+*.log
 .env
 .env.*
 *.pem
