@@ -339,3 +339,19 @@ docker compose up -d --build
 docker compose ps
 curl -I http://localhost:8080/
 ```
+<img width="993" height="477" alt="image" src="https://github.com/user-attachments/assets/bf62ebf0-1fb6-48c8-a7c0-d3fa6d08e3c2" />
+<img width="436" height="65" alt="image" src="https://github.com/user-attachments/assets/3cddec0a-67c5-4a22-81fb-6c716667745a" />
+<img width="1004" height="65" alt="image" src="https://github.com/user-attachments/assets/378f31e3-1388-4903-b541-c3cc022e0530" />
+<img width="512" height="171" alt="image" src="https://github.com/user-attachments/assets/6e93a668-becc-4405-ad84-d4ff039b536e" />
+<img width="524" height="37" alt="image" src="https://github.com/user-attachments/assets/06ad4e2b-8940-4eba-8448-4558c2bb9dfe" />
+<img width="693" height="107" alt="image" src="https://github.com/user-attachments/assets/74af237b-8994-4df4-a1b8-6c615496fad1" />
+<img width="526" height="73" alt="image" src="https://github.com/user-attachments/assets/c7953a62-387f-4207-a963-ed6b53428976" />
+<img width="889" height="34" alt="image" src="https://github.com/user-attachments/assets/663c704f-2417-48e5-bfdd-7a817c18b0ca" />
+<img width="883" height="30" alt="image" src="https://github.com/user-attachments/assets/174bed38-8102-4d95-a17e-d7ceb4e10909" />
+**И как итог!**
+<img width="942" height="206" alt="image" src="https://github.com/user-attachments/assets/c6ceba5d-45f2-4b4f-85f2-97ed9f444ebf" />
+
+
+
+
+
