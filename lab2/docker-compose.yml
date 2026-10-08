@@ -1,0 +1,19 @@
+services:
+  frontend:
+    build:
+      context: ../lab0/frontend
+      dockerfile: ../../lab2/Dockerfile.frontend
+      args:
+        VITE_BACKEND_URL: /api
+    image: todo-frontend:good
+    ports:
+      - "8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+    networks:
+      - front-net
+
+networks:
+  front-net:
