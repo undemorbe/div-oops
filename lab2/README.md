@@ -286,8 +286,72 @@ Docker сам забирает файл, если он лежит рядом с 
 
 ## docker-compose.yml
 
-Теперь переходим к самому главному - docker-compose файлу. В нем мы будем собирать все 3 образа (фронт, бэк и БД), и настроим все так, чтобы оно запускалось в контейнере одной командой. Вот весь docker-compose.yml файл:
+Теперь переходим к самому главному - docker-compose файлу. В нем мы будем собирать все 3 образа (фронт, бэк и БД), и настроим все так, чтобы все сервисы запускались одной командой. Вот весь docker-compose.yml файл:
 ```
+services:
+  frontend:
+    build:
+      context: ../lab0/frontend
+      dockerfile: ../../lab2/Dockerfile.frontend
+      args:
+        VITE_BACKEND_URL: /api
+    image: todo-frontend:good
+    ports:
+      - "8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - frontend-net
+
+  backend:
+    build:
+      context: ../lab0/backend
+      dockerfile: ../../lab2/Dockerfile.backend
+    image: todo-backend:good
+    environment:
+      PORT: "5040"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: todo_list_user
+      DB_PASSWORD: "12345678"
+      DB_NAME: todo_list_db
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - frontend-net
+      - backend-net
+
+  postgres:
+    image: postgres:16.10-alpine3.22
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: todo_list_user
+      POSTGRES_PASSWORD: "12345678"
+      POSTGRES_DB: todo_list_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - backend-net
+
+networks:
+  frontend-net:
+  backend-net:
+    internal: true
+
+volumes:
+  postgres-data:
+
 ```
 
 Разберем каждый сервис внутри него отдельно
@@ -304,7 +368,7 @@ Docker сам забирает файл, если он лежит рядом с 
 
 Сначала также указываем путь до нужного Dockerfile. Затем указываем .env файл (без его бэкенд не запустится. Также в нем могут быть секретные ключи, которые лучше не указывать в самом docker-compose)
 
-После устанавливаем переменные окружения. Порт и параметры БД лучше явно задать в самом docker-compose, чтобы нормально взаимодействовать с БД и фронтом, даже если в .env другие параметры.
+После устанавливаем переменные окружения. Порт и параметры БД лучше явно задать в самом docker-compose, чтобы нормально взаимодействовать с БД и фронтом, даже если в .env другие параметры. Поскольку БД будет только внутри контейнера, никаких секретных данных мы не покажем
 
 Теперь установим зависимость от БД (бэк запускается при условии, что БД работает). Подключим сразу к двум сетям, чтобы сервис мог взаимодействовать и с БД, и с фронтом. Это разделение нужно, чтобы фронтенд не мог обращаться к БД.
 
@@ -321,3 +385,16 @@ Docker сам забирает файл, если он лежит рядом с 
 ![alt text](screenshots/compose_up.png)
 
 Теперь зайдем на сайт:
+![alt text](screenshots/compose_web.png)
+
+Как можно заметить, все работает как надо. Одной командой запускаются все наши сервисы, и сайт работает. После этого проверим, что данные сохраняются в бд после удаления контейнера с БД:
+![alt text](screenshots/compose_rm.png)
+
+Остановим и заново запустим docker-compose, после чего зайдем на наш сайт:
+![alt text](screenshots/compose_web_2.png)
+Действительно, созданная запись осталась, значит данные действительно сохраняются в томе
+
+Дальше проверим, что фронтенд не имеет доступа к БД. Для этого войдем внутрь контейнера с фронтом и проверим доступность БД с помощью команды ```nc -zvw 3 postgres 5432``` - эта команда проверяет соединение с БД, и если достучаться не получается, то через 3 секунды выведет ошибку. После попробуем сделать то же самое с контейнером для бэкенда:
+![alt text](screenshots/db_connection_test.png)
+
+Превосходно, все работает. И на этом наша лаба закончилась: мы смогли запустить все наши сервисы одной командой через docker-compose, сайт работает, данные сохраняются в томе даже после удаления контейнера, фронтенд не имеет доступа к БД. Если подытожить, докер - отличный инструмент для разработчиков и DevOps, который позволяет разворачивать проекты вне зависимости от устройства и с учетом всех зависимостей, и его знание обязательно пригодится в проф. деятельности

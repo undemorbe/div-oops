@@ -26,9 +26,9 @@ services:
       PORT: "5040"
       DB_HOST: postgres
       DB_PORT: "5432"
-      DB_USER: ${DB_USER:?DB_USER не задан в lab2/.env}
-      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD не задан в lab2/.env}
-      DB_NAME: ${DB_NAME:?DB_NAME не задан в lab2/.env}
+      DB_USER: todo_list_user
+      DB_PASSWORD: "12345678"
+      DB_NAME: todo_list_db
     restart: unless-stopped
     depends_on:
       postgres:
@@ -41,9 +41,9 @@ services:
     image: postgres:16.10-alpine3.22
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:?DB_USER не задан в lab2/.env}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD не задан в lab2/.env}
-      POSTGRES_DB: ${DB_NAME:?DB_NAME не задан в lab2/.env}
+      POSTGRES_USER: todo_list_user
+      POSTGRES_PASSWORD: "12345678"
+      POSTGRES_DB: todo_list_db
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
