@@ -5,7 +5,7 @@ services:
       dockerfile: ../../lab2/Dockerfile.frontend
       args:
         VITE_BACKEND_URL: /api
-    image: todo-frontend
+    image: todo-frontend:good
     ports:
       - "8080:8080"
     read_only: true
@@ -21,16 +21,14 @@ services:
     build:
       context: ../lab0/backend
       dockerfile: ../../lab2/Dockerfile.backend
-    env_file:
-      - ../lab0/backend/.env
-    image: todo-backend
+    image: todo-backend:good
     environment:
       PORT: "5040"
       DB_HOST: postgres
       DB_PORT: "5432"
-      DB_USER: todo_list_user
-      DB_PASSWORD: "12345678"
-      DB_NAME: todo_list_db
+      DB_USER: ${DB_USER:?DB_USER не задан в lab2/.env}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD не задан в lab2/.env}
+      DB_NAME: ${DB_NAME:?DB_NAME не задан в lab2/.env}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -40,16 +38,16 @@ services:
       - backend-net
 
   postgres:
-    image: postgres:16
+    image: postgres:16.10-alpine3.22
     restart: unless-stopped
     environment:
-      POSTGRES_USER: todo_list_user
-      POSTGRES_PASSWORD: "12345678"
-      POSTGRES_DB: todo_list_db
+      POSTGRES_USER: ${DB_USER:?DB_USER не задан в lab2/.env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD не задан в lab2/.env}
+      POSTGRES_DB: ${DB_NAME:?DB_NAME не задан в lab2/.env}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U todo_list_user -d todo_list_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 3

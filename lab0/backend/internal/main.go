@@ -8,17 +8,13 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var Port string
-
 func main() {
 	r := gin.Default()
-
-	Log.Info("")
 
 	InitLogger()
 
 	if err := godotenv.Load(); err != nil {
-		Log.Fatal("Ошибка при загрузке .env файла")
+		Log.Warn(".env файл не найден, используются переменные окружения")
 	}
 
 	db, err := NewPostgresConnection()
@@ -57,9 +53,13 @@ func main() {
 		api.DELETE("/tasks", handler.DeleteTasks)
 	}
 
+	r.GET("/health", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
 	Log.Info("Сервер запущен на порту :" + port)
 
-	if err := r.Run(":" + Port); err != nil {
+	if err := r.Run(":" + port); err != nil {
 		Log.Error(err)
 	}
 }
