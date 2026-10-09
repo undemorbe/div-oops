@@ -225,30 +225,30 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
 
 Копируем только то, что реально нужно для сборки (`index.html`, `vite.config.js`, `src`), а не все подряд. В образ не попадет лишнее, и кэш не сбрасывается из-за посторонних файлов.
 
-`ARG VITE_BACKEND_URL=/api` - Vite вшивает переменные `VITE_*` прямо в JSбандл во время сборки, в рантайме их уже не поменять. Поэтому передаем адрес бэкенда как аргумент сборки (`ARG`) - он существует только во время сборки и его можно переопределить из compose. `ENV` для этого хуже — он остается в метаданных образа. Значение `/api` относительное, то есть браузер ходит на тот же хост, где открыт сайт (в nginx), и CORS не нужен.
+`ARG VITE_BACKEND_URL=/api` - Vite вшивает переменные `VITE_*` прямо в JSбандл во время сборки, в рантайме их уже не поменять. Поэтому передаем адрес бэкенда как аргумент сборки (`ARG`) - он существует только во время сборки и его можно переопределить из compose. `ENV` для этого хуже - он остается в метаданных образа. Значение `/api` относительное, то есть браузер ходит на тот же хост, где открыт сайт (в nginx), и CORS не нужен.
 
 #### Стадия запуска
 
 `nginxinc/nginx-unprivileged` — вариант nginx, который сразу работает от непривилегированного пользователя (`uid 101`). Обычный образ `nginx` стартует от root, потому что занимает порт 80: порты ниже 1024 без root занять нельзя. Поэтому unprivileged-версия слушает порт **8080**.
 
-Конфиг nginx встраиваем прямо в Dockerfile через heredoc (`COPY <<'CONF' ... CONF`). Контекст сборки — `lab0/frontend`, а `COPY` не может взять файл снаружи контекста. Так Dockerfile не требует отдельного файла с конфигом.
+Конфиг nginx встраиваем прямо в Dockerfile через heredoc (`COPY <<'CONF' ... CONF`). Контекст сборки - `lab0/frontend`, а `COPY` не может взять файл снаружи контекста. Так Dockerfile не требует отдельного файла с конфигом.
 
-`COPY --from=builder /app/dist` — в финальный образ попадает только собранная статика: ни Node, ни `node_modules`, ни исходников, ни секретов. Итог — **90 МБ** против **1.88 ГБ** у `.bad`.
+`COPY --from=builder /app/dist` — в финальный образ попадает только собранная статика: ни Node, ни `node_modules`, ни исходников, ни секретов. Итог - **90 МБ** против **1.88 ГБ** у `.bad`.
 
-`USER nginx` — в базовом образе уже так, но строка явно фиксирует, что запуск не от root.
+`USER nginx` - в базовом образе уже так, но строка явно фиксирует, что запуск не от root.
 
-`HEALTHCHECK` через `wget --spider` раз в 30 секунд проверяет, что nginx отвечает (`--spider` — не скачивать тело ответа). `CMD` не пишем: он наследуется от базового образа (`nginx -g 'daemon off;'`).
+`HEALTHCHECK` через `wget --spider` раз в 30 секунд проверяет, что nginx отвечает (`--spider` - не скачивать тело ответа). `CMD` не пишем: он наследуется от базового образа (`nginx -g 'daemon off;'`).
 
 #### Что в конфиге nginx
 
 - `try_files $uri $uri/ /index.html` — SPA fallback: любой неизвестный путь отдает `index.html`, а дальше разбирается JS.
-- `location /assets/` — Vite кладет в имена файлов хеш (`index-CWG7AxkJ.js`), поэтому их можно кэшировать в браузере на год (`immutable`). При изменении кода поменяется и имя файла.
+- `location /assets/` - Vite кладет в имена файлов хеш (`index-CWG7AxkJ.js`), поэтому их можно кэшировать в браузере на год (`immutable`). При изменении кода поменяется и имя файла.
 - `Cache-Control: no-cache` для `index.html` — иначе браузер не увидит новый бандл после деплоя.
-- `gzip` — сжимаем JS, CSS и JSON при отдаче.
+- `gzip` - сжимаем JS, CSS и JSON при отдаче.
 - `server_tokens off` — не показываем версию nginx в заголовках.
-- `location /api/` — проксируем запросы на бэкенд. Адрес задается через переменную `set $backend` + `resolver 127.0.0.11` (встроенный DNS Docker). Если написать `proxy_pass http://backend:5040` напрямую, nginx резолвит имя при старте и падает, если бэкенда нет. С переменной имя резолвится при каждом запросе, поэтому nginx стартует и без бэкенда (на `/api` отдаст 502), а когда бэкенд появится — заработает без правок конфига. Путь передается как есть (`/api/tasks` → `/api/tasks`), это совпадает с `r.Group("/api")` в бэкенде.
-- `proxy_set_header Host / X-Real-IP / X-Forwarded-*` — чтобы бэкенд видел реальный IP клиента, а не IP nginx.
-- `proxy_connect_timeout` и `proxy_read_timeout` — чтобы зависший бэкенд не держал соединения бесконечно.
+- `location /api/` - проксируем запросы на бэкенд. Адрес задается через переменную `set $backend` + `resolver 127.0.0.11` (встроенный DNS Docker). Если написать `proxy_pass http://backend:5040` напрямую, nginx резолвит имя при старте и падает, если бэкенда нет. С переменной имя резолвится при каждом запросе, поэтому nginx стартует и без бэкенда (на `/api` отдаст 502), а когда бэкенд появится — заработает без правок конфига. Путь передается как есть (`/api/tasks` → `/api/tasks`), это совпадает с `r.Group("/api")` в бэкенде.
+- `proxy_set_header Host / X-Real-IP / X-Forwarded-*` - чтобы бэкенд видел реальный IP клиента, а не IP nginx.
+- `proxy_connect_timeout` и `proxy_read_timeout` - чтобы зависший бэкенд не держал соединения бесконечно.
 
 #### Dockerfile.frontend.dockerignore
 
@@ -286,64 +286,38 @@ Docker сам забирает файл, если он лежит рядом с 
 
 ## docker-compose.yml
 
-Фронтенд compose
-
+Теперь переходим к самому главному - docker-compose файлу. В нем мы будем собирать все 3 образа (фронт, бэк и БД), и настроим все так, чтобы оно запускалось в контейнере одной командой. Вот весь docker-compose.yml файл:
 ```
-services:
-  frontend:
-    build:
-      context: ../lab0/frontend
-      dockerfile: ../../lab2/Dockerfile.frontend
-      args:
-        VITE_BACKEND_URL: /api
-    image: todo-frontend:good
-    ports:
-      - "8080:8080"
-    read_only: true
-    tmpfs:
-      - /tmp
-    restart: unless-stopped
-    networks:
-      - front-net
-
-networks:
-  front-net:
 ```
 
-- `context: ../lab0/frontend` и `dockerfile: ../../lab2/Dockerfile.frontend` — код лежит в lab0, а Dockerfile в lab2. Путь к `dockerfile` в compose считается от `context`.
-- `args: VITE_BACKEND_URL` — передает значение в `ARG` из Dockerfile.
-- `image: todo-frontend:good` — понятное имя собранного образа.
-- `ports: "8080:8080"` — единственная точка входа снаружи. Бэкенд потом публиковать не нужно, он будет доступен только через nginx.
-- `read_only: true` + `tmpfs: /tmp` — файловая система контейнера только для чтения, даже при взломе ничего не записать. Nginx пишет только pid и временные файлы в `/tmp`, поэтому `/tmp` монтируем в память. Строка в логах `can not modify /etc/nginx/conf.d/default.conf (read-only file system?)` — это нормально: скрипт образа просто пропускает включение IPv6.
-- `restart: unless-stopped` — контейнер поднимется после падения или перезапуска Docker, но не после ручного `docker stop`.
-- Сеть `front-net` бекенд подключим к этой же сети, и nginx найдет его по имени `backend`.
+Разберем каждый сервис внутри него отдельно
 
-Запуск:
+### 1) Фронтенд
 
-```
-cd lab2
-docker compose up -d --build
-```
+Сначала собираем образ из нашего Dockerfile для фронтенда, указывая контекстную путь и путь до самого Dockerfile (из-за нашего неудачного выбора структуры репозитория, а именно - все файлы docker находятся вне самого проекта, приходится так прописывать пути)
 
-Проверка:
+Затем с помощью args передаем значение в ARG из Dockerfile. Указываем имя образа, порты. Также сделаем файловую систему контейнера только для чтения, даже при взломе ничего не записать. Nginx пишет только pid и временные файлы в /tmp, поэтому /tmp монтируем в память. 
 
-```
-docker compose ps
-curl -I http://localhost:8080/
-```
-<img width="993" height="477" alt="image" src="https://github.com/user-attachments/assets/bf62ebf0-1fb6-48c8-a7c0-d3fa6d08e3c2" />
-<img width="436" height="65" alt="image" src="https://github.com/user-attachments/assets/3cddec0a-67c5-4a22-81fb-6c716667745a" />
-<img width="1004" height="65" alt="image" src="https://github.com/user-attachments/assets/378f31e3-1388-4903-b541-c3cc022e0530" />
-<img width="512" height="171" alt="image" src="https://github.com/user-attachments/assets/6e93a668-becc-4405-ad84-d4ff039b536e" />
-<img width="524" height="37" alt="image" src="https://github.com/user-attachments/assets/06ad4e2b-8940-4eba-8448-4558c2bb9dfe" />
-<img width="693" height="107" alt="image" src="https://github.com/user-attachments/assets/74af237b-8994-4df4-a1b8-6c615496fad1" />
-<img width="526" height="73" alt="image" src="https://github.com/user-attachments/assets/c7953a62-387f-4207-a963-ed6b53428976" />
-<img width="889" height="34" alt="image" src="https://github.com/user-attachments/assets/663c704f-2417-48e5-bfdd-7a817c18b0ca" />
-<img width="883" height="30" alt="image" src="https://github.com/user-attachments/assets/174bed38-8102-4d95-a17e-d7ceb4e10909" />
-**И как итог!**
-<img width="942" height="206" alt="image" src="https://github.com/user-attachments/assets/c6ceba5d-45f2-4b4f-85f2-97ed9f444ebf" />
+Ставим restart: unless-stopped - теперь контейнер поднимется после падения или перезапуска Docker. Указываем сеть frontend-net и укажем, что frontend зависит от бэкенд
 
+### 2) Бэкенд
 
+Сначала также указываем путь до нужного Dockerfile. Затем указываем .env файл (без его бэкенд не запустится. Также в нем могут быть секретные ключи, которые лучше не указывать в самом docker-compose)
 
+После устанавливаем переменные окружения. Порт и параметры БД лучше явно задать в самом docker-compose, чтобы нормально взаимодействовать с БД и фронтом, даже если в .env другие параметры.
 
+Теперь установим зависимость от БД (бэк запускается при условии, что БД работает). Подключим сразу к двум сетям, чтобы сервис мог взаимодействовать и с БД, и с фронтом. Это разделение нужно, чтобы фронтенд не мог обращаться к БД.
 
+### 3) БД
+
+Укажем образ и restart: unless-stopped, дальше укажем переменные окружения - пользователя и название БД (такие же, как у бэка).
+Укажем том, в котором БД будет хранить данные.
+
+Также добавим проверку состояния: раз в 10 секунд проверяется состояние БД
+
+Под конец, объявим сети (у сети бэкенд поставим internal: true, что означает внутренняя изолированная сеть). Затем объявим тома, и на этом нах docker-compose кончается
+
+Проверим, что все работает. Запустим наш контейнер:
+![alt text](screenshots/compose_up.png)
+
+Теперь зайдем на сайт:
