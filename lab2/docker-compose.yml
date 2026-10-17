@@ -12,8 +12,11 @@ services:
     tmpfs:
       - /tmp
     restart: unless-stopped
+    mem_limit: 256m
+    cpus: 1.00
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - frontend-net
 
@@ -30,6 +33,8 @@ services:
       DB_PASSWORD: "12345678"
       DB_NAME: todo_list_db
     restart: unless-stopped
+    mem_limit: 256m
+    cpus: 1.00
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,6 +45,8 @@ services:
   postgres:
     image: postgres:16.10-alpine3.22
     restart: unless-stopped
+    mem_limit: 256m
+    cpus: 2.00
     environment:
       POSTGRES_USER: todo_list_user
       POSTGRES_PASSWORD: "12345678"
