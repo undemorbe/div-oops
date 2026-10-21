@@ -157,3 +157,9 @@ jobs:
             - name: Build frontend
               run: npm run build
 ```
+
+
+## Frontend CI результат
+![alt text](image-1.png)
+
+Приступим к docker + trivy.
