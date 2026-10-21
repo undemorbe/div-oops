@@ -22,5 +22,5 @@ jobs:
               working-directory: lab0/frontend
               run: npm install
             # Чтобы максимально плохо было, можно убрать две строчки ниже) 
-            - name: Build frontend
-              run: npm run build
+            # - name: Build frontend
+            #   run: npm run build
