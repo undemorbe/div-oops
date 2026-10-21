@@ -67,5 +67,3 @@ form.addEventListener('submit', async (e) => {
 })
 
 loadTasks()
-
-ОШИБКА ТУТ БЛИИН!!
