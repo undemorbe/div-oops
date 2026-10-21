@@ -5,6 +5,7 @@ on:
         branches: [main]
     pull_request:
         branches: [main]
+    workflow_dispatch:
 
 jobs:
     build:
@@ -21,6 +22,8 @@ jobs:
             - name: Install dependencies
               working-directory: lab0/frontend
               run: npm install
+            - name: Run tests
+              run: npm test
             # Чтобы максимально плохо было, можно убрать две строчки ниже) 
-            # - name: Build frontend
-            #   run: npm run build
+            - name: Build frontend
+              run: npm run build
