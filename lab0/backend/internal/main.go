@@ -9,8 +9,6 @@ import (
 )
 
 func main() {
-	r := gin.Default()
-
 	InitLogger()
 
 	if err := godotenv.Load(); err != nil {
@@ -38,6 +36,20 @@ func main() {
 	if instanceID == "" {
 		instanceID = "backend:" + port
 	}
+
+	r := NewRouter(handler, instanceID, port)
+
+	Log.Info("Сервер запущен на порту :" + port)
+
+	if err := r.Run(":" + port); err != nil {
+		Log.Error(err)
+	}
+}
+
+// NewRouter собирает все маршруты. Вынесено из main, чтобы тестировать HTTP-слой без БД.
+func NewRouter(handler *Handler, instanceID, port string) *gin.Engine {
+	r := gin.Default()
+
 	r.Use(func(c *gin.Context) {
 		c.Header("X-Instance-Id", instanceID)
 		c.Next()
@@ -57,9 +69,5 @@ func main() {
 		c.Status(http.StatusOK)
 	})
 
-	Log.Info("Сервер запущен на порту :" + port)
-
-	if err := r.Run(":" + port); err != nil {
-		Log.Error(err)
-	}
+	return r
 }

@@ -26,12 +26,6 @@ func (h *Handler) PostTask(c *gin.Context) {
 		return
 	}
 
-	if req.Task.Title == "" {
-		Log.Warn("Отсутствует Title")
-		c.Status(http.StatusBadRequest)
-		return
-	}
-
 	task := Task{Title: req.Task.Title}
 
 	err = h.db.Save(&task).Error

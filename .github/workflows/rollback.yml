@@ -1,0 +1,46 @@
+name: Rollback
+
+# Ручной откат прода: Actions -> Rollback -> Run workflow.
+# Без tag — на последнюю рабочую версию из журнала деплоев, с tag — на указанную (sha-1a2b3c4).
+on:
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: 'Тег образа (sha-xxxxxxx). Пусто — последняя рабочая версия'
+                required: false
+                default: ''
+
+permissions:
+    contents: read
+    packages: read
+
+jobs:
+    rollback:
+        name: Rollback production
+        runs-on: [self-hosted, macOS, ARM64, todo-prod]
+        environment:
+            name: production
+            url: http://localhost:8088
+        concurrency:
+            group: production
+            cancel-in-progress: false
+        steps:
+            - name: Checkout deploy scripts
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  sparse-checkout: lab3/deploy
+
+            - name: Log in to GHCR
+              run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+            - name: Rollback
+              env:
+                  TAG: ${{ inputs.tag }}
+              run: lab3/deploy/rollback.sh $TAG
+
+            - name: Log out from GHCR
+              if: always()
+              run: docker logout ghcr.io
+
+            - name: curl deployed service
+              run: lab3/deploy/smoke.sh

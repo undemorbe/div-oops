@@ -1,0 +1,37 @@
+name: Bad CI/CD
+
+# Намеренно плохой пайплайн для Лабы 3. Работает — и именно этим опасен.
+on: push
+
+jobs:
+    everything:
+        runs-on: ubuntu-latest
+        env:
+            DB_USER: todo_list_user
+            DB_PASSWORD: "12345678"
+            DB_NAME: todo_list_db
+        steps:
+            - uses: actions/checkout@main
+
+            - name: Build
+              run: |
+                  docker build -t todo-backend:latest -f lab2/Dockerfile.backend.bad lab0/backend
+                  docker build -t todo-frontend:latest -f lab2/Dockerfile.frontend.bad lab0/frontend
+
+            - name: Deploy
+              run: |
+                  docker network create todo || true
+                  docker rm -f postgres backend frontend || true
+                  docker run -d --name postgres --network todo \
+                    -e POSTGRES_USER=$DB_USER -e POSTGRES_PASSWORD=$DB_PASSWORD -e POSTGRES_DB=$DB_NAME \
+                    postgres:latest
+                  sleep 15
+                  docker run -d --name backend --network todo -p 5040:5040 \
+                    -e PORT=5040 -e DB_HOST=postgres -e DB_PORT=5432 \
+                    -e DB_USER=$DB_USER -e DB_PASSWORD=$DB_PASSWORD -e DB_NAME=$DB_NAME \
+                    todo-backend:latest
+                  docker run -d --name frontend -p 80:80 todo-frontend:latest
+                  sleep 10
+
+            - name: Check
+              run: curl http://localhost:5040/api/tasks || true

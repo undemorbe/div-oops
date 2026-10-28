@@ -1,4 +1,3 @@
-
 import { defineConfig, loadEnv } from 'vite'
 import http from 'node:http'
 import https from 'node:https'
@@ -58,7 +57,7 @@ function apiProxyPlugin(target) {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-   const target = env.BACKEND_PROXY_TARGET || 'http://localhost:5040'
+  const target = env.BACKEND_PROXY_TARGET || 'http://localhost:5040'
 
   const hasCerts = fs.existsSync('./localhost-key.pem') && fs.existsSync('./localhost.pem')
 

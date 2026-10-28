@@ -1,0 +1,29 @@
+name: Frontend bad CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+    workflow_dispatch:
+
+jobs:
+    build:
+        name: Install and build bad frontend
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+            - name: Install latest Node.js
+              uses: actions/setup-node@v4
+              with:
+                node-version: "latest"
+            - name: Install dependencies
+              working-directory: lab0/frontend
+              run: npm install
+            - name: Run tests
+              run: npm test
+            # Чтобы максимально плохо было, можно убрать две строчки ниже) 
+            - name: Build frontend
+              run: npm run build

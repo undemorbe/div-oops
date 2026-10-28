@@ -1,0 +1,55 @@
+name: Frontend CI
+
+on:
+    push:
+        branches: [main]
+        paths: 
+            - 'lab0/frontend/**'
+            - '.github/workflows/frontend-ci.yml'
+    pull_request:
+        branches: [main]
+        paths: 
+            - 'lab0/frontend/**'
+            - '.github/workflows/frontend-ci.yml'
+    workflow_dispatch:
+        
+permissions:
+    contents: read
+
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+    build: 
+        name: Install and build frontend
+        runs-on: ubuntu-24.04
+
+        defaults:
+          run:
+            working-directory: lab0/frontend
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                    node-version: '22.23.3'
+                    cache: 'npm'
+                    cache-dependency-path: lab0/frontend/package-lock.json
+            - name: Install dependencies
+              run: npm ci
+              
+            - name: Static analysis
+              run: npm run lint
+
+            - name: Check formatiing 
+              run: npm run format:check
+
+            - name: Run tests
+              run: npm test
+
+            - name: Build frontend
+              run: npm run build
