@@ -1,0 +1,274 @@
+name: CI/CD
+
+# Код проверяется на push и PR; публикация и деплой — только на push (PR из форков до прода не доходят).
+on:
+    push:
+        branches: [main, lab3]
+        paths:
+            - 'lab0/backend/**'
+            - 'lab0/frontend/**'
+            - 'lab2/Dockerfile.*'
+            - 'lab3/deploy/**'
+            - '.github/workflows/cicd.yml'
+    pull_request:
+        branches: [main]
+        paths:
+            - 'lab0/backend/**'
+            - 'lab0/frontend/**'
+            - 'lab2/Dockerfile.*'
+            - 'lab3/deploy/**'
+            - '.github/workflows/cicd.yml'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: cicd-${{ github.ref }}
+    cancel-in-progress: true
+
+env:
+    REGISTRY: ghcr.io/${{ github.repository }}
+    # Trivy запускаем из образа, закреплённого по digest: в марте 2026 теги trivy-action и образы 0.69.5/0.69.6 были подменены.
+    TRIVY_IMAGE: aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
+
+jobs:
+    # 1. Проверка кода: lint + тесты бэкенда и фронтенда
+    test-backend:
+        name: Lint & test backend
+        runs-on: ubuntu-24.04
+        defaults:
+            run:
+                working-directory: lab0/backend
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+            - name: Setup Go
+              uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+              with:
+                  go-version-file: lab0/backend/go.mod
+                  cache-dependency-path: lab0/backend/go.sum
+
+            - name: Check formatting (gofmt)
+              run: |
+                  unformatted="$(gofmt -l .)"
+                  if [ -n "$unformatted" ]; then
+                    echo "::error::Файлы не отформатированы gofmt:"
+                    echo "$unformatted"
+                    exit 1
+                  fi
+
+            - name: Static analysis (go vet)
+              run: go vet ./...
+
+            - name: Run tests
+              run: go test -v -race ./...
+
+    test-frontend:
+        name: Lint & test frontend
+        runs-on: ubuntu-24.04
+        defaults:
+            run:
+                working-directory: lab0/frontend
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+            - name: Setup Node.js
+              uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+              with:
+                  node-version: '22.23.3'
+                  cache: 'npm'
+                  cache-dependency-path: lab0/frontend/package-lock.json
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Static analysis
+              run: npm run lint
+
+            - name: Check formatting
+              run: npm run format:check
+
+            - name: Run tests
+              run: npm test
+
+    # 2. Сборка образов из Лабы 2. arm64-раннер — потому что прод (Mac на Apple Silicon) тоже arm64.
+    build:
+        name: Build ${{ matrix.service }} image
+        needs: [test-backend, test-frontend]
+        runs-on: ubuntu-24.04-arm
+        strategy:
+            matrix:
+                include:
+                    - service: backend
+                      context: lab0/backend
+                      dockerfile: lab2/Dockerfile.backend
+                    - service: frontend
+                      context: lab0/frontend
+                      dockerfile: lab2/Dockerfile.frontend
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+            - name: Image tag
+              id: tag
+              run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+            - name: Setup Docker Buildx
+              uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+            - name: Build image (layer cache in GitHub Actions cache)
+              uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+              with:
+                  context: ${{ matrix.context }}
+                  file: ${{ matrix.dockerfile }}
+                  tags: ${{ env.REGISTRY }}/${{ matrix.service }}:${{ steps.tag.outputs.tag }}
+                  labels: |
+                      org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+                      org.opencontainers.image.revision=${{ github.sha }}
+                  outputs: type=docker,dest=${{ runner.temp }}/${{ matrix.service }}.tar
+                  cache-from: type=gha,scope=${{ matrix.service }}
+                  cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+            - name: Upload image artifact
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              with:
+                  name: image-${{ matrix.service }}
+                  path: ${{ runner.temp }}/${{ matrix.service }}.tar
+                  retention-days: 1
+
+    # 3. Security gate: Trivy валит пайплайн, если в образе есть хоть одна CRITICAL-уязвимость
+    scan:
+        name: Trivy scan ${{ matrix.service }}
+        needs: build
+        runs-on: ubuntu-24.04-arm
+        strategy:
+            fail-fast: false
+            matrix:
+                service: [backend, frontend]
+        steps:
+            - name: Download image artifact
+              uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+              with:
+                  name: image-${{ matrix.service }}
+                  path: ${{ runner.temp }}
+
+            - name: Cache Trivy DB
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: ${{ runner.temp }}/trivy-cache
+                  key: trivy-db-${{ github.run_id }}
+                  restore-keys: trivy-db-
+
+            - name: Trivy report (CRITICAL + HIGH, informational)
+              run: |
+                  trivy() {
+                    docker run --rm -v "$RUNNER_TEMP:/work" -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+                      "$TRIVY_IMAGE" --quiet "$@"
+                  }
+                  trivy image --input /work/${{ matrix.service }}.tar --scanners vuln --skip-version-check \
+                    --severity CRITICAL,HIGH --format table
+                  trivy image --input /work/${{ matrix.service }}.tar --scanners vuln --skip-version-check \
+                    --skip-db-update --format json --output /work/trivy-${{ matrix.service }}.json
+                  {
+                    echo "### Trivy: ${{ matrix.service }}"
+                    echo "| Target | CRITICAL | HIGH | MEDIUM | LOW |"
+                    echo "|---|---|---|---|---|"
+                    jq -r '.Results[] | [.Target, ([.Vulnerabilities[]?.Severity] as $s
+                      | ("CRITICAL","HIGH","MEDIUM","LOW") as $l | [$s[] | select(. == $l)] | length)]
+                      | "| \(.[0]) | \(.[1]) | \(.[2]) | \(.[3]) | \(.[4]) |"' "$RUNNER_TEMP/trivy-${{ matrix.service }}.json"
+                  } >> "$GITHUB_STEP_SUMMARY"
+
+            - name: Trivy gate (fail on CRITICAL)
+              run: |
+                  docker run --rm -v "$RUNNER_TEMP:/work" -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+                    "$TRIVY_IMAGE" --quiet image --input /work/${{ matrix.service }}.tar --scanners vuln \
+                    --skip-version-check --skip-db-update --severity CRITICAL --exit-code 1 --format table
+
+            - name: Upload Trivy report
+              if: always()
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              with:
+                  name: trivy-${{ matrix.service }}
+                  path: ${{ runner.temp }}/trivy-${{ matrix.service }}.json
+                  if-no-files-found: ignore
+
+    # 4. Публикация: в реестр попадает только то, что прошло тесты и скан. Тег — неизменяемый sha-<commit>.
+    push:
+        name: Push images to GHCR
+        needs: scan
+        if: github.event_name != 'pull_request'
+        runs-on: ubuntu-24.04-arm
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            - name: Download image artifacts
+              uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+              with:
+                  pattern: image-*
+                  merge-multiple: true
+                  path: ${{ runner.temp }}
+
+            - name: Log in to GHCR
+              uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Push
+              run: |
+                  tag="sha-${GITHUB_SHA::7}"
+                  for service in backend frontend; do
+                    docker load --input "$RUNNER_TEMP/$service.tar"
+                    docker push "$REGISTRY/$service:$tag"
+                  done
+
+    # 5. Деплой на self-hosted runner (Mac) — "прод" этой лабы
+    deploy:
+        name: Deploy to production
+        needs: push
+        runs-on: [self-hosted, macOS, ARM64, todo-prod]
+        environment:
+            name: production
+            url: http://localhost:8088
+        concurrency:
+            group: production
+            cancel-in-progress: false
+        permissions:
+            contents: read
+            packages: read
+        steps:
+            - name: Checkout deploy scripts
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  sparse-checkout: lab3/deploy
+
+            - name: Log in to GHCR
+              run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+            - name: Deploy
+              env:
+                  DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+              run: lab3/deploy/deploy.sh "sha-${GITHUB_SHA::7}"
+
+            - name: Log out from GHCR
+              if: always()
+              run: docker logout ghcr.io
+
+    # 6. Проверка живого сервиса
+    smoke:
+        name: Smoke test (curl)
+        needs: deploy
+        runs-on: [self-hosted, macOS, ARM64, todo-prod]
+        steps:
+            - name: Checkout deploy scripts
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  sparse-checkout: lab3/deploy
+
+            - name: curl deployed service
+              run: lab3/deploy/smoke.sh
