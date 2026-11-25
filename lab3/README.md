@@ -46,6 +46,7 @@ on:
         branches: [main]
     pull_request:
         branches: [main]
+    workflow_dispatch:
 
 jobs:
     build:
@@ -62,9 +63,13 @@ jobs:
             - name: Install dependencies
               working-directory: lab0/frontend
               run: npm install
-            # Чтобы максимально плохо было, можно убрать две строчки ниже) 
-            # - name: Build frontend
-            #   run: npm run build
+            # Чтобы максимально плохо было, можно убрать строчки ниже) 
+            - name: Run tests
+              working-directory: lab0/frontend
+              run: npm test
+            - name: Build frontend
+              working-directory: lab0/frontend
+              run: npm run build
 ```
 
 ## Frontend g00d CI

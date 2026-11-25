@@ -22,8 +22,10 @@ jobs:
             - name: Install dependencies
               working-directory: lab0/frontend
               run: npm install
+            # Чтобы максимально плохо было, можно убрать строчки ниже) 
             - name: Run tests
+              working-directory: lab0/frontend
               run: npm test
-            # Чтобы максимально плохо было, можно убрать две строчки ниже) 
             - name: Build frontend
+              working-directory: lab0/frontend
               run: npm run build
