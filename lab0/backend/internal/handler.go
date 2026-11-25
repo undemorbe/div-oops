@@ -63,9 +63,9 @@ func (h *Handler) GetTasks(c *gin.Context) {
 		})
 	}
 
-	_ = GetTasksResponse{Tasks: taskModels}
+	response := GetTasksResponse{Tasks: taskModels}
 
-	c.JSON(http.StatusOK, nil)
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *Handler) DeleteTasks(c *gin.Context) {
