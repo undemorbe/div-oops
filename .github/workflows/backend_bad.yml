@@ -1,0 +1,30 @@
+name: Backend bad CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build backend (bad)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+
+      - name: Download dependencies
+        working-directory: lab0/backend
+        run: go mod download
+
+      - name: Build backend
+        working-directory: lab0/backend
+        run: go build -o server ./internal

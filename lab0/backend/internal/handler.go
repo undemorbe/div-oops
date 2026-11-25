@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -16,12 +17,17 @@ func NewHandler(db *gorm.DB) *Handler {
 }
 
 func (h *Handler) PostTask(c *gin.Context) {
-
 	var req PostTaskRequest
 
 	err := c.BindJSON(&req)
 	if err != nil {
-		Log.Warn("Некорректнеый запрос: ", err)
+		Log.Warn("Некорректный запрос: ", err)
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if strings.TrimSpace(req.Task.Title) == "" {
+		Log.Warn("Получен запрос с пустым заголовком задачи")
 		c.Status(http.StatusBadRequest)
 		return
 	}

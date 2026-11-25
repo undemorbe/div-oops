@@ -1,0 +1,56 @@
+name: Backend CI
+
+on:
+  workflow_call:
+  push:
+    branches: [main]
+    paths:
+      - 'lab0/backend/**'
+      - '.github/workflows/backend_ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'lab0/backend/**'
+      - '.github/workflows/backend_ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test and lint backend
+    runs-on: ubuntu-24.04
+
+    defaults:
+      run:
+        working-directory: lab0/backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+
+      - name: Static analysis
+        run: go vet ./...
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build backend
+        run: go build -o server ./internal
