@@ -44,9 +44,9 @@ services:
 
   postgres:
     image: postgres:16.10-alpine3.22
-    restart: unless-stopped
+    restart: no
     mem_limit: 256m
-    cpus: 2.00
+    cpus: 2.0
     environment:
       POSTGRES_USER: todo_list_user
       POSTGRES_PASSWORD: "12345678"
