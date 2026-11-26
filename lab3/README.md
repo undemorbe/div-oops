@@ -577,3 +577,6 @@ RUN apt-get update && \
 ```
 
 Попробуем запустить пайплайн теперь:
+![alt text](screenshots/trivy_frontend_fail.png)
+
+А про фронтенд то мы и забыли. 5 уязвимостей в nginx, и одна в каком-то brotli-libs. Попробуем решить похожим образом - просто обновим пакеты командой "RUN apk upgrade --no-cache" в начале второй стадии.
