@@ -60,7 +60,7 @@ jobs:
           cache-to: type=gha,scope=frontend,mode=max
       
       - name: Scan backend image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: image
           image-ref: ${{ env.IMAGE_PREFIX }}/backend:${{ env.IMAGE_TAG }}
@@ -69,7 +69,7 @@ jobs:
           severity: CRITICAL
 
       - name: Scan frontend image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: image
           image-ref: ${{ env.IMAGE_PREFIX }}/frontend:${{ env.IMAGE_TAG }}
