@@ -14,7 +14,7 @@ ARG VITE_BACKEND_URL=/api
 RUN npm run build
 
 
-FROM nginxinc/nginx-unprivileged:1.30.7-alpine3.24
+FROM ghcr.io/nginx/nginx-unprivileged:1.30.7-alpine3.24
 
 USER root
 
