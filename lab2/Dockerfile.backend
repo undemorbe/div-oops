@@ -11,9 +11,9 @@ COPY . .
 RUN CGO_ENABLED=0 go build -o server ./internal
 
 
-FROM alpine:3.22.1
+FROM golang:1.25.11
 
-RUN adduser -D backend_user
+RUN useradd -m backend_user
 
 WORKDIR /app
 
