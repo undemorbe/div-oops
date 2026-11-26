@@ -12,6 +12,10 @@ env:
 permissions:
   contents: read
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   backend-ci:
     name: Backend CI
