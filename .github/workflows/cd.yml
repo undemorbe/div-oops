@@ -59,9 +59,19 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,scope=frontend,mode=max
       
+      - name: Install Trivy
+        run: |
+          curl -fsSL -o trivy.tar.gz \
+            https://github.com/aquasecurity/trivy/releases/download/v0.63.0/trivy_0.63.0_Linux-64bit.tar.gz
+
+          tar -xzf trivy.tar.gz trivy
+          sudo install trivy /usr/local/bin/trivy
+          trivy --version
+          
       - name: Scan backend image
         uses: aquasecurity/trivy-action@v0.31.0
         with:
+          skip-setup-trivy: true
           scan-type: image
           image-ref: ${{ env.IMAGE_PREFIX }}/backend:${{ env.IMAGE_TAG }}
           format: table
@@ -71,6 +81,7 @@ jobs:
       - name: Scan frontend image
         uses: aquasecurity/trivy-action@v0.31.0
         with:
+          skip-setup-trivy: true
           scan-type: image
           image-ref: ${{ env.IMAGE_PREFIX }}/frontend:${{ env.IMAGE_TAG }}
           format: table
