@@ -13,6 +13,11 @@ RUN CGO_ENABLED=0 go build -o server ./internal
 
 FROM golang:1.25.11
 
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN useradd -m backend_user
 
 WORKDIR /app
